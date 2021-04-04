@@ -77,6 +77,32 @@ const bcg = {
   },
 };
 
+// declarando a imagem de game over
+const gameOverSprite = {
+  spriteX: 134,
+  spriteY: 153,
+  width: 226,
+  height: 200,
+  x: canvas.width / 2 - 226 / 2,
+  y: 50,
+  draw() {
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.drawImage(
+      sprites,
+      gameOverSprite.spriteX,
+      gameOverSprite.spriteY,
+      gameOverSprite.width,
+      gameOverSprite.height,
+      gameOverSprite.x,
+      gameOverSprite.y,
+      gameOverSprite.width,
+      gameOverSprite.height
+    );
+  },
+};
+
 function createPipes() {
   // declarando os tubos
   const pipes = {
@@ -137,7 +163,7 @@ function createPipes() {
       });
     },
     collisionWithPlayer(pipe) {
-      if (globalAux.player.x >= pipe.x) {
+      if (globalAux.player.x + globalAux.player.width - 12 >= pipe.x) {
         // verificando se o jogador esta colidindo como tubo pela parte de cima do sprite
         if (globalAux.player.y <= pipe.pipeUp.y) return true;
         // verificando se o jogador esta colidindo como tubo pela parte de baixo do sprite
@@ -160,7 +186,10 @@ function createPipes() {
         // atribuindo velocidade aos tubos que são criados
         i.x -= pipes.pipeSpeed;
         // checando se há colisão do jogador com os tubos
-        if (pipes.collisionWithPlayer(i)) changeScreen(screen.START);
+        if (pipes.collisionWithPlayer(i)) {
+          changeScreen(screen.GAMEOVER);
+          return;
+        }
         // caso os tubo cheguem ao fim da tela eles são apagados
         if (i.x + pipes.width <= 0) pipes.pairPipes.shift();
       });
@@ -234,7 +263,7 @@ function createPlayer() {
     currentFrame: 0,
     updateCurrentFrame() {
       const intervalFrame = 10; // delimitador de frame para alterar a animação do jogador
-      const checkInterval = frame % 10 === 0; // retorna true a cada intervalFrame declarado acima
+      const checkInterval = frame % intervalFrame === 0; // retorna true a cada intervalFrame declarado acima
       // troca o sprite do jogador a cada checkInterval
       if (checkInterval) {
         const incrementValue = 1;
@@ -247,7 +276,7 @@ function createPlayer() {
       if (collisionCheck(player, globalAux.floor)) {
         sndHit.play();
         setTimeout(() => {
-          changeScreen(screen.START);
+          changeScreen(screen.GAMEOVER);
         }, 500);
         return;
       }
@@ -275,6 +304,25 @@ function createPlayer() {
     },
   };
   return player;
+}
+
+// declarando o score
+function createScore() {
+  const scoreGame = {
+    score: 0,
+    draw() {
+      ctx.font = "35px VT323";
+      ctx.textAlign = "right";
+      ctx.fillStyle = "white";
+      ctx.fillText(scoreGame.score, canvas.width - 10, 35);
+    },
+    update() {
+      const intervalFrame = 30; // delimitador de frame para alterar a animação do jogador
+      const checkInterval = frame % intervalFrame === 0; // retorna true a cada intervalFrame declarado acima
+      if (checkInterval) scoreGame.score++;
+    },
+  };
+  return scoreGame;
 }
 
 // declarando função que checa colisão do player com o chão
@@ -310,20 +358,36 @@ const screen = {
       globalAux.player = createPlayer();
       globalAux.floor = createFloor();
       globalAux.pipes = createPipes();
+      globalAux.score = createScore();
     },
     draw() {
       bcg.draw();
       globalAux.player.draw();
       globalAux.pipes.draw();
       globalAux.floor.draw();
+      globalAux.score.draw();
     },
     update() {
       globalAux.player.update();
       globalAux.floor.update();
       globalAux.pipes.update();
+      globalAux.score.update();
     },
     click() {
       globalAux.player.jump();
+    },
+  },
+  GAMEOVER: {
+    begin() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height); // Limpando a tela assim que o jogo é reiniciado
+    },
+    draw() {
+      gameOverSprite.draw();
+      globalAux.score.draw();
+    },
+    update() {},
+    click() {
+      changeScreen(screen.START);
     },
   },
 };
