@@ -2,6 +2,9 @@
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
+// instanciando uma variavel de frame para controlar o tempo de jogo
+let frame = 0;
+
 // instanciando uma variável global auxiliar
 const globalAux = {};
 
@@ -74,42 +77,144 @@ const bcg = {
   },
 };
 
-// declarando a imagem do chão
-const floor = {
-  spriteX: 0,
-  spriteY: 610,
-  width: 224,
-  height: 112,
-  x: 0,
-  y: canvas.height - 112,
-  draw() {
-    ctx.drawImage(
-      sprites,
-      floor.spriteX,
-      floor.spriteY,
-      floor.width,
-      floor.height,
-      floor.x,
-      floor.y,
-      floor.width,
-      floor.height
-    );
-    ctx.drawImage(
-      sprites,
-      floor.spriteX,
-      floor.spriteY,
-      floor.width,
-      floor.height,
-      floor.x + floor.width,
-      floor.y,
-      floor.width,
-      floor.height
-    );
-  },
-};
+function createPipes() {
+  // declarando os tubos
+  const pipes = {
+    bottom: {
+      spriteX: 0,
+      spriteY: 169,
+    },
+    up: {
+      spriteX: 52,
+      spriteY: 169,
+    },
+    width: 52,
+    height: 400,
+    pipeSpeed: 2,
+    gap: 80,
+    pairPipes: [],
+    draw() {
+      pipes.pairPipes.forEach((pair) => {
+        const randomY = pair.y;
+        // desenhando o tubo de cima
+        const pipeUpX = pair.x;
+        const pipeUpY = randomY;
+        ctx.drawImage(
+          sprites,
+          pipes.up.spriteX,
+          pipes.up.spriteY,
+          pipes.width,
+          pipes.height,
+          pipeUpX,
+          pipeUpY,
+          pipes.width,
+          pipes.height
+        );
+        // desenhando o tubo de baixo
+        const pipeBotX = pair.x;
+        const pipeBotY = pipes.height + pipes.gap + randomY;
+        ctx.drawImage(
+          sprites,
+          pipes.bottom.spriteX,
+          pipes.bottom.spriteY,
+          pipes.width,
+          pipes.height,
+          pipeBotX,
+          pipeBotY,
+          pipes.width,
+          pipes.height
+        );
+
+        pair.pipeUp = {
+          x: pipeUpX,
+          y: pipes.height + pipeUpY,
+        };
+
+        pair.pipeBot = {
+          x: pipeBotX,
+          y: pipeBotY,
+        };
+      });
+    },
+    collisionWithPlayer(pipe) {
+      if (globalAux.player.x >= pipe.x) {
+        // verificando se o jogador esta colidindo como tubo pela parte de cima do sprite
+        if (globalAux.player.y <= pipe.pipeUp.y) return true;
+        // verificando se o jogador esta colidindo como tubo pela parte de baixo do sprite
+        if (globalAux.player.y + globalAux.player.height >= pipe.pipeBot.y)
+          return true;
+
+        return false;
+      }
+    },
+    update() {
+      const intervalFrame = frame % 100 === 0;
+      if (intervalFrame) {
+        pipes.pairPipes.push({
+          x: canvas.width,
+          y: -150 * (Math.random() + 1),
+        });
+      }
+
+      pipes.pairPipes.forEach((i) => {
+        // atribuindo velocidade aos tubos que são criados
+        i.x -= pipes.pipeSpeed;
+        // checando se há colisão do jogador com os tubos
+        if (pipes.collisionWithPlayer(i)) changeScreen(screen.START);
+        // caso os tubo cheguem ao fim da tela eles são apagados
+        if (i.x + pipes.width <= 0) pipes.pairPipes.shift();
+      });
+    },
+  };
+  return pipes;
+}
+
+function createFloor() {
+  // declarando a imagem do chão
+  const floor = {
+    spriteX: 0,
+    spriteY: 610,
+    width: 224,
+    height: 112,
+    x: 0,
+    y: canvas.height - 112,
+    update() {
+      // faz com que o chão se movimente de forma infinita
+      const floorSpeed = 1;
+      const repeatFloor = floor.width / 2;
+      const moveFloor = floor.x - floorSpeed;
+      floor.x = moveFloor % repeatFloor;
+    },
+    draw() {
+      ctx.drawImage(
+        sprites,
+        floor.spriteX,
+        floor.spriteY,
+        floor.width,
+        floor.height,
+        floor.x,
+        floor.y,
+        floor.width,
+        floor.height
+      );
+      ctx.drawImage(
+        sprites,
+        floor.spriteX,
+        floor.spriteY,
+        floor.width,
+        floor.height,
+        floor.x + floor.width,
+        floor.y,
+        floor.width,
+        floor.height
+      );
+    },
+  };
+  return floor;
+}
 
 // criando a função de criar player para sempre instanciar um novo jogador quando o jogo é reiniciado.
-function createObject() {
+function createPlayer() {
   // declarando o player
   const player = {
     spriteX: 0,
@@ -121,9 +226,25 @@ function createObject() {
     gravity: 0.25,
     speed: 0,
     jumpForce: -4.6,
+    animationMove: [
+      { spriteX: 0, spriteY: 0 },
+      { spriteX: 0, spriteY: 26 },
+      { spriteX: 0, spriteY: 52 },
+    ],
+    currentFrame: 0,
+    updateCurrentFrame() {
+      const intervalFrame = 10; // delimitador de frame para alterar a animação do jogador
+      const checkInterval = frame % 10 === 0; // retorna true a cada intervalFrame declarado acima
+      // troca o sprite do jogador a cada checkInterval
+      if (checkInterval) {
+        const incrementValue = 1;
+        const increment = incrementValue + player.currentFrame;
+        const repeatBase = player.animationMove.length;
+        player.currentFrame = increment % repeatBase;
+      }
+    },
     update() {
-      if (collisionCheck(player, floor)) {
-        console.log("deu certo");
+      if (collisionCheck(player, globalAux.floor)) {
         sndHit.play();
         setTimeout(() => {
           changeScreen(screen.START);
@@ -135,10 +256,12 @@ function createObject() {
       player.y += player.speed;
     },
     draw() {
+      player.updateCurrentFrame();
+      const { spriteX, spriteY } = player.animationMove[player.currentFrame];
       ctx.drawImage(
         sprites,
-        player.spriteX,
-        player.spriteY,
+        spriteX,
+        spriteY,
         player.width,
         player.height,
         player.x,
@@ -184,15 +307,20 @@ const screen = {
   },
   GAME: {
     begin() {
-      globalAux.player = createObject();
+      globalAux.player = createPlayer();
+      globalAux.floor = createFloor();
+      globalAux.pipes = createPipes();
     },
     draw() {
       bcg.draw();
       globalAux.player.draw();
-      floor.draw();
+      globalAux.pipes.draw();
+      globalAux.floor.draw();
     },
     update() {
       globalAux.player.update();
+      globalAux.floor.update();
+      globalAux.pipes.update();
     },
     click() {
       globalAux.player.jump();
@@ -204,6 +332,7 @@ const screen = {
 function loop() {
   currentScreen.draw();
   currentScreen.update();
+  frame++;
   requestAnimationFrame(loop);
 }
 
@@ -211,5 +340,7 @@ window.addEventListener("click", () => {
   if (currentScreen.click) currentScreen.click();
 });
 
+// iniciando o jogo na tela START
 changeScreen(screen.START);
+// declaração do loop do jogo
 loop();
